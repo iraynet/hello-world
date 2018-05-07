@@ -473,6 +473,8 @@ out.println("</th>");
 						css = "class='"+sign+"60 "+bold+"'";
 					} else if (hso.concentration * Math.abs(hso.changeInOI) >= 100) {
 						css = "class='"+sign+"50 "+bold+"'";
+					} else {
+						css = "class='"+sign+"50 "+bold+"'";
 					}
 				}
 			}
