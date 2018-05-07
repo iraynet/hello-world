@@ -52,6 +52,9 @@
 	.form td {
 		text-align: left;
 	}
+	.text-left {
+		text-align: left;
+	}
 	
 	.over50 { background: #ebfaeb; }
 .over60 { background: #c2f0c2; }
@@ -207,7 +210,7 @@ HashMap<String, HashMap<String, Hso>> allBigOpens = new HashMap<String, HashMap<
 
 while (dateOfWork.after(lastTradeDayOfTheMonth) || dateOfWork.equals(lastTradeDayOfTheMonth) /*Get pervious month end*/) 
 {
-HashMap<String, Hso> bigOpen = new HashMap<String, Hso>();
+HashMap<String, Hso> bigOpen = null;
 
 	fileHkexHso = new File(path + subPath + sdfFolder.format(dateOfWork.getTime()) + "hkexhso-"+ sdfFile.format(dateOfWork.getTime())+".htm");
 	if (fileHkexHso.exists()) 
@@ -259,8 +262,17 @@ HashMap<String, Hso> bigOpen = new HashMap<String, Hso>();
 					hso.openInterest = Integer.parseInt(values[9]);
 					hso.changeInOI = Integer.parseInt(values[10]);
 					
-					if (hso.contractMonth.equals(currentMonth)) 
+					if (hso.contractMonth.equals(currentMonth) || hso.contractMonth.equals(nextMonth)) 
 					{
+char side = hso.strikePrice.trim().charAt(hso.strikePrice.length()-1);
+if (allBigOpens.containsKey(sdfFile.format(dateOfWork.getTime())+hso.contractMonth+side)) 
+{
+	bigOpen = allBigOpens.get(sdfFile.format(dateOfWork.getTime())+hso.contractMonth+side);
+}
+else 
+{
+	bigOpen = new HashMap<String, Hso>();
+}
 boolean isDone = false;
 if (bigOpen.containsKey("1")) {
  Hso big1 = bigOpen.get("1");
@@ -301,6 +313,8 @@ if (bigOpen.containsKey("3")) {
  isDone = true;
 }
 }
+allBigOpens.put(sdfFile.format(dateOfWork.getTime())+hso.contractMonth+side, bigOpen);
+
 
 
 					}
@@ -337,7 +351,6 @@ if (bigOpen.containsKey("3")) {
 		fileIn.close();
 		
 		dailyHso.put(sdfFile.format(dateOfWork.getTime()), data);
-		allBigOpens.put(sdfFile.format(dateOfWork.getTime()), bigOpen);
 		yAxis.add(sdfFile.format(dateOfWork.getTime()));
 	
 		if (dayCounter>32) {
@@ -387,17 +400,24 @@ for (int x=0; x<xAxis.size(); x++)
 		out.println("<th>"+tempContr+"</th>");
 		for (int y=0; y<yAxis.size(); y++) 
 		{
-			out.println("<th>"+yAxis.get(y));
-if (currentContr.equals("")) {
-HashMap<String, Hso> bigOpen = allBigOpens.get(yAxis.get(y));
-out.println("<br />"+bigOpen.get("1").strikePrice);
-out.println("<br />"+bigOpen.get("2").strikePrice);
-out.println("<br />"+bigOpen.get("3").strikePrice);
-}
-out.println("</th>");
+			out.println("<th>"+yAxis.get(y)+"</th>");
 
 		}
+if (temp[0].equals(currentMonth) || temp[0].equals(nextMonth)) {		
+		out.println("<tr class='text-left'>");
+		out.println("<th>最大未平倉</th>");
+		for (int y=0; y<yAxis.size(); y++) 
+		{
+			out.println("<th>");
+HashMap<String, Hso> bigOpen = allBigOpens.get(yAxis.get(y)+temp[0] + side);
+out.println(bigOpen.get("1").strikePrice);
+out.println("<br />"+bigOpen.get("2").strikePrice);
+out.println("<br />"+bigOpen.get("3").strikePrice);
+out.println("</th>");
+		}
 		out.println("</tr>");
+}
+
 		currentContr = tempContr;
 	}
 	
@@ -460,7 +480,9 @@ out.println("</th>");
 			if (sf.showClose!=null && sf.showClose.equals("y")) {
 				row.append("<br /> " + printNumericValue(hso.close));
 			}
+			/*if (sf.showOpenInterest!=null && sf.showOpenInterest.equals("y")) {
 				row.append("<br /> " + printNumericValue(hso.openInterest));
+			}*/
 			row.append("</td>");
 				
 		}
