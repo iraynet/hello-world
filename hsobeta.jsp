@@ -88,9 +88,14 @@ if (System.getProperty("os.name").toLowerCase().indexOf("win") >= 0)
 	path = "C:/Users/rchan/Documents/Personal/";	
 }
 
+//HSO started after hours trading on 2018-05-14
+Calendar dateOfNewFormat = Calendar.getInstance();
+dateOfNewFormat.set(2018, Calendar.MAY, 13, 0 ,0 ,0); //13 is Sunday
+
 //Check timezone - can have better config
 Calendar now = Calendar.getInstance();
 Calendar dateOfWork = Calendar.getInstance();
+
 
 if (now.getTimeZone().getID().equals("UTC")) {
 	now.add(Calendar.HOUR, 8);	
@@ -168,20 +173,20 @@ if (dateOfWork.get(Calendar.MONTH) == now.get(Calendar.MONTH)) {
 	dateOfWork.add(Calendar.MONTH, -1);
 }
 dateOfWork.set(Calendar.DATE, dateOfWork.getActualMaximum(Calendar.DATE));
-File fileHkexHso = new File(path + subPath + sdfFolder.format(dateOfWork.getTime()) + "hkexhso-"+ sdfFile.format(dateOfWork.getTime())+".htm");
+File fileHkexHso = new File(path + subPathHso + sdfFolder.format(dateOfWork.getTime()) + "hkexhso-"+ sdfFile.format(dateOfWork.getTime())+".htm");
 while (!fileHkexHso.exists()) {
 	dateOfWork.add(Calendar.DATE, -1);
-	fileHkexHso = new File(path + subPath + sdfFolder.format(dateOfWork.getTime()) + "hkexhso-"+ sdfFile.format(dateOfWork.getTime())+".htm");
+	fileHkexHso = new File(path + subPathHso + sdfFolder.format(dateOfWork.getTime()) + "hkexhso-"+ sdfFile.format(dateOfWork.getTime())+".htm");
 	
 }
 if (dateOfWork.after(startDate)) 
 {
 	dateOfWork.add(Calendar.MONTH, -1);
 	dateOfWork.set(Calendar.DATE, dateOfWork.getActualMaximum(Calendar.DATE));
-	fileHkexHso = new File(path + subPath + sdfFolder.format(dateOfWork.getTime()) + "hkexhso-"+ sdfFile.format(dateOfWork.getTime())+".htm");
+	fileHkexHso = new File(path + subPathHso + sdfFolder.format(dateOfWork.getTime()) + "hkexhso-"+ sdfFile.format(dateOfWork.getTime())+".htm");
 	while (!fileHkexHso.exists()) {
 		dateOfWork.add(Calendar.DATE, -1);
-		fileHkexHso = new File(path + subPath + sdfFolder.format(dateOfWork.getTime()) + "hkexhso-"+ sdfFile.format(dateOfWork.getTime())+".htm");
+		fileHkexHso = new File(path + subPathHso + sdfFolder.format(dateOfWork.getTime()) + "hkexhso-"+ sdfFile.format(dateOfWork.getTime())+".htm");
 	}
 }
 lastTradeDayOfTheMonth.setTimeInMillis(dateOfWork.getTimeInMillis());
@@ -207,23 +212,107 @@ HashMap<String, HashMap<String, Hso>> dailyHso = new HashMap<String, HashMap<Str
 ArrayList<String> xAxis = new ArrayList<String>();
 ArrayList<String> yAxis = new ArrayList<String>();
 HashMap<String, HashMap<String, Hso>> allBigOpens = new HashMap<String, HashMap<String, Hso>>();
+HashMap<String, Hso> dailyHsf = new HashMap<String, Hso>();
 
 while (dateOfWork.after(lastTradeDayOfTheMonth) || dateOfWork.equals(lastTradeDayOfTheMonth) /*Get pervious month end*/) 
 {
 HashMap<String, Hso> bigOpen = null;
 
-	fileHkexHso = new File(path + subPath + sdfFolder.format(dateOfWork.getTime()) + "hkexhso-"+ sdfFile.format(dateOfWork.getTime())+".htm");
+	fileHkexHso = new File(path + subPathHso + sdfFolder.format(dateOfWork.getTime()) + "hkexhso-"+ sdfFile.format(dateOfWork.getTime())+".htm");
 	if (fileHkexHso.exists()) 
 	{	
 		HashMap<String, Hso> data = new HashMap<String, Hso>();
 		
-		InputStreamReader fileIn = new InputStreamReader(new FileInputStream(fileHkexHso), "UTF-8");
+    //HSF
+    int counterLine = 0;
+		int startOfData = 23;
+		String endOfData = "END OF REPORT";
+
+    File fileHkexHsf = new File(path + subPathHsf + sdfFolder.format(dateOfWork.getTime()) + "hkexhsf-"+ sdfFile.format(dateOfWork.getTime())+".htm");
+	  InputStreamReader fileIn = new InputStreamReader(new FileInputStream(fileHkexHsf), "UTF-8");
 		BufferedReader br = new BufferedReader(fileIn);
 		
-		int counterLine = 0;
-		int startOfData = 36;
-		String endOfData = "END OF REPORT";
+    while ((line = br.readLine()) != null)
+    {
+      line = this.cleanLine(line);
+			counterLine++;
+			
+			if (line.indexOf(endOfData) >= 0) 
+			{	
+				break;
+			}
+			
+			if (counterLine >= startOfData && line.length() == 151) 
+			{
+        String contractMonth = line.substring(0, 6);
+        //out.println(line.length() + " : " + line);
+          
+        if (contractMonth.equals(currentMonth)) {
+          line = line.substring(50, 100);
+          //0         1         2         3         4         5         6         7         8         9  
+				  //0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890
+				  //  30,970  31,143  30,869 178,661   31,094     +415
+          int [] pos = {0, 9, 17, 24, 33, 41, 50};
+				  String [] values = {"", "", "", "", "",  "", ""};
+				  for (int i=0; i<pos.length-1; i++) {
+					  values[i] = line.substring(pos[i], pos[i+1]).trim().replace(",","");
+            //out.println(values[i] + "<br>");
+					  if (values[i].equals("-")) {
+						  values[i] = strNA;
+					  }
+				  }
+
+          Hso hso = new Hso();
+					hso.contractMonth = contractMonth;
+					hso.openingPrice = Integer.parseInt(values[0]);
+					hso.dayHigh = Integer.parseInt(values[1]);
+					hso.dayLow = Integer.parseInt(values[2]);
+					hso.close = Integer.parseInt(values[4]);
+					
+          dailyHsf.put(sdfFile.format(dateOfWork.getTime())+hso.contractMonth, hso);
+          break;
+        }
+      }
+    }
+
+    //HSO
+		fileIn = new InputStreamReader(new FileInputStream(fileHkexHso), "UTF-8");
+		br = new BufferedReader(fileIn);
 		
+		counterLine = 0;
+		startOfData = 36;
+		endOfData = "END OF REPORT";
+		
+    //0         1         2         3         4         5         6         7         8         9  
+		//0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890
+    //CONTRACT STRIKE*OPENING  *DAILY  *DAILY  O.Q.P.   O.Q.P.  IV%   VOLUME      OPEN    CHANGE
+    //MONTH     PRICE   PRICE    HIGH     LOW   CLOSE   CHANGE                INTEREST     IN OI
+		//MAR-18  16800 C       0       0       0   14653     -133    0        0         8         0
+    //0         1         2         3         4         5         6         7         8         9        10        11        12        13        14        15        16        17    
+    //0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890
+		//CONTRACT STRIKE *OPENING  *DAILY  *DAILY   CLOSE  VOLUME  |*OPENING  *DAILY  *DAILY  O.Q.P.   O.Q.P.  IV%     VOLUME  | *Contract *Contract     Volume      Open Change in
+    //MONTH     PRICE    PRICE    HIGH     LOW   PRICE          |   PRICE    HIGH     LOW   CLOSE   CHANGE                  |      High       Low             Interest        OI
+    //MAY-18  22000 C        0       0       0       0       0  |       0       0       0    9458     +364    0          0  |      8097      8097          0         3         0
+		int [] pos1 = {0, 7, 16, 24, 32, 40, 48, 57, 62, 71, 81, 90};
+		int [] pos2 = {0, 7, 16, 24, 32, 40, 48, 57, 59, 67, 75, 83, 91, 100, 105, 116, 119, 129, 139, 150, 160, 170};
+		int [] pos = null;
+    int [] ids1 = {0, 1, 2, 3, 4,  5,   6,  7,  8,  9, 10};
+    int [] ids2 = {0, 1, 8, 9, 10, 11, 12, 13, 18, 19, 20};
+    int [] ids = null;
+    int lineLen1 = 90;
+    int lineLen2 = 170;
+    int lineLen = 0;
+
+    if (dateOfWork.before(dateOfNewFormat)) {
+      pos = pos1;
+      ids = ids1;
+      lineLen = lineLen1;
+    } else {
+      pos = pos2;
+      ids = ids2;
+      lineLen = lineLen2;
+    }
+
 		while ((line = br.readLine()) != null) 
 		{
 			line = this.cleanLine(line);
@@ -234,14 +323,12 @@ HashMap<String, Hso> bigOpen = null;
 				break;
 			}
 			
-			if (counterLine >= startOfData && line.length() == 90) 
+			if (counterLine >= startOfData && line.length() == lineLen) 
 			{
-				//0         1         2         3         4         5         6         7         8         9  
-				//0123456789012345678901234567890123456789012345678901234567890123456789012345678901234567890
-				//MAR-18  16800 C       0       0       0   14653     -133    0        0         8         0
-				int [] pos = {0, 7, 16, 24, 32, 40, 48, 57, 62, 71, 81, 90};
-				String [] values = {"", "", "", "", "",  "", "", "", "", "", "", ""};
-				for (int i=0; i<pos.length-1; i++) {
+				
+        String [] values = {"", "", "", "", "",  "", "", "", "", "", "", "", "", "", "", "",  "", "", "", "", "", "", ""}; //max. 21
+				
+        for (int i=0; i<pos.length-1; i++) {
 					values[i] = line.substring(pos[i], pos[i+1]).trim();
 					if (values[i].equals("-")) {
 						values[i] = strNA;
@@ -250,74 +337,73 @@ HashMap<String, Hso> bigOpen = null;
 				if (values[0].matches("[A-Z]{3}-[0-9]{2}")) 
 				{
 					Hso hso = new Hso();
-					hso.contractMonth = values[0];
-					hso.strikePrice = values[1];
-					hso.openingPrice = Integer.parseInt(values[2]);
-					hso.dayHigh = Integer.parseInt(values[3]);
-					hso.dayLow = Integer.parseInt(values[4]);
-					hso.close = Integer.parseInt(values[5]);
-					hso.change = Integer.parseInt(values[6]);
-					hso.ivPercentage = Integer.parseInt(values[7]);
-					hso.volume = Integer.parseInt(values[8]);
-					hso.openInterest = Integer.parseInt(values[9]);
-					hso.changeInOI = Integer.parseInt(values[10]);
-					
-					if (hso.contractMonth.equals(currentMonth) || hso.contractMonth.equals(nextMonth)) 
-					{
-char side = hso.strikePrice.trim().charAt(hso.strikePrice.length()-1);
-if (allBigOpens.containsKey(sdfFile.format(dateOfWork.getTime())+hso.contractMonth+side)) 
+					hso.contractMonth = values[ids[0]];
+					hso.strikePrice = values[ids[1]];
+					hso.openingPrice = Integer.parseInt(values[ids[2]]);
+					hso.dayHigh = Integer.parseInt(values[ids[3]]);
+					hso.dayLow = Integer.parseInt(values[ids[4]]);
+					hso.close = Integer.parseInt(values[ids[5]]);
+					hso.change = Integer.parseInt(values[ids[6]]);
+					hso.ivPercentage = Integer.parseInt(values[ids[7]]);
+					hso.volume = Integer.parseInt(values[ids[8]]);
+					hso.openInterest = Integer.parseInt(values[ids[9]]);
+					hso.changeInOI = Integer.parseInt(values[ids[10]]);
+
+if (hso.contractMonth.equals(currentMonth) || hso.contractMonth.equals(nextMonth)) 
 {
-	bigOpen = allBigOpens.get(sdfFile.format(dateOfWork.getTime())+hso.contractMonth+side);
-}
-else 
-{
-	bigOpen = new HashMap<String, Hso>();
-}
-boolean isDone = false;
-if (bigOpen.containsKey("1")) {
- Hso big1 = bigOpen.get("1");
- if (hso.openInterest > big1.openInterest) {
-  bigOpen.put("3", bigOpen.get("2"));
-  bigOpen.put("2", bigOpen.get("1"));
-  bigOpen.put("1", hso);
-  isDone = true;
- } 
-}
-else {
- bigOpen.put("1", hso);
- isDone = true;
+  char side = hso.strikePrice.trim().charAt(hso.strikePrice.length()-1);
+  if (allBigOpens.containsKey(sdfFile.format(dateOfWork.getTime())+hso.contractMonth+side)) 
+  {
+	  bigOpen = allBigOpens.get(sdfFile.format(dateOfWork.getTime())+hso.contractMonth+side);
+  }
+  else 
+  {
+	  bigOpen = new HashMap<String, Hso>();
+  }
+  boolean isDone = false;
+  if (bigOpen.containsKey("1")) {
+    Hso big1 = bigOpen.get("1");
+    if (hso.openInterest > big1.openInterest) {
+      bigOpen.put("3", bigOpen.get("2"));
+      bigOpen.put("2", bigOpen.get("1"));
+      bigOpen.put("1", hso);
+      isDone = true;
+    } 
+  }
+  else {
+    bigOpen.put("1", hso);
+    isDone = true;
+  }
+
+  if (!isDone) {
+    if (bigOpen.containsKey("2")) {
+      Hso big2 = bigOpen.get("2");
+      if (hso.openInterest > big2.openInterest) {
+        bigOpen.put("3", bigOpen.get("2"));
+        bigOpen.put("2", hso);
+        isDone = true;  
+      }
+    } else {
+      bigOpen.put("2", hso);
+      isDone = true;
+    }
+  }
+  if (!isDone) {
+    if (bigOpen.containsKey("3")) {
+      Hso big3 = bigOpen.get("3");
+      if (hso.openInterest > big3.openInterest) {
+        bigOpen.put("3", hso);
+        isDone = true;  
+      }
+    } else {
+      bigOpen.put("3", hso);
+      isDone = true;
+    }
+  }
+  
+  allBigOpens.put(sdfFile.format(dateOfWork.getTime())+hso.contractMonth+side, bigOpen);
 }
 
-if (!isDone) {
-if (bigOpen.containsKey("2")) {
- Hso big2 = bigOpen.get("2");
- if (hso.openInterest > big2.openInterest) {
-  bigOpen.put("3", bigOpen.get("2"));
-  bigOpen.put("2", hso);
-  isDone = true;  
- }
-} else {
- bigOpen.put("2", hso);
- isDone = true;
-}
-}
-if (!isDone) {
-if (bigOpen.containsKey("3")) {
- Hso big3 = bigOpen.get("3");
- if (hso.openInterest > big3.openInterest) {
-  bigOpen.put("3", hso);
-  isDone = true;  
- }
-} else {
- bigOpen.put("3", hso);
- isDone = true;
-}
-}
-allBigOpens.put(sdfFile.format(dateOfWork.getTime())+hso.contractMonth+side, bigOpen);
-
-
-
-					}
 					/*	if (hso.strikePrice.endsWith("C")) {
 							maxOICurrentCall = hso.openInterest;	
 						} else if (hso.strikePrice.endsWith("P")) {
@@ -403,13 +489,24 @@ for (int x=0; x<xAxis.size(); x++)
 			out.println("<th>"+yAxis.get(y)+"</th>");
 
 		}
+if (false && temp[0].equals(currentMonth)) {
+  out.println("<tr class='text-left'>");
+	out.println("<th>HSF Open<br />High<br />Low<br />Close<br /></th>");
+		for (int y=0; y<yAxis.size(); y++) 
+		{
+      Hso data = dailyHsf.get(yAxis.get(y)+temp[0]);
+      out.println("<th>"+data.openingPrice+"<br />"+data.dayHigh+"<br />"+data.dayLow+"<br />"+data.close+"<br /></th>");
+    }
+    out.println("</tr>");
+}
+
 if (temp[0].equals(currentMonth) || temp[0].equals(nextMonth)) {		
 		out.println("<tr class='text-left'>");
-		out.println("<th>最大未平倉</th>");
+		out.println("<th>Biggest OI</th>");
 		for (int y=0; y<yAxis.size(); y++) 
 		{
 			out.println("<th>");
-HashMap<String, Hso> bigOpen = allBigOpens.get(yAxis.get(y)+temp[0] + side);
+HashMap<String, Hso> bigOpen = allBigOpens.get(yAxis.get(y) + temp[0] + side);
 out.println(bigOpen.get("1").strikePrice);
 out.println("<br />"+bigOpen.get("2").strikePrice);
 out.println("<br />"+bigOpen.get("3").strikePrice);
@@ -443,7 +540,12 @@ out.println("</th>");
 				show = true;
 				if (Math.abs(hso.changeInOI) > sf.turnoverFrom) {
 					bold = " b";
-					css = "class='"+bold+"'";
+          css = "class='"+bold+"'";
+          /*if (hso.changeInOI >= 0) {
+					  css = "class='call "+bold+"'";
+          } else {
+            css = "class='put "+bold+"'";
+          }*/
 				}
 				if (hso.changeInOI > 0) {
 					sign = "over";
@@ -506,7 +608,8 @@ catch (Exception e)
 </html>
 <%!
 private String path = "/home/mr_chan_ray/data/";
-private String subPath = "hso/";
+private String subPathHso = "hso/";
+private String subPathHsf = "hsf/";
 private String strNA = "-99999";
 private int intNA = -99999;
 private String SEPARATOR = "!";
@@ -621,4 +724,3 @@ private String printSearchPercentageValue(double value) {
 }
 
 %>
-
